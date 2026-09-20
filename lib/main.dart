@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
+import 'screens/menu_screen.dart';
 
 void main() {
-  runApp(const MainApp());
+  runApp(const BlocksterApp());
 }
 
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+class BlocksterApp extends StatelessWidget {
+  const BlocksterApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Text('Hello World!'),
-        ),
-      ),
+    return MaterialApp(
+      title: 'Blockster',
+      theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
+      home: const MenuScreen(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
