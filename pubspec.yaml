@@ -12,6 +12,7 @@ dependencies:
   flutter:
     sdk: flutter
   shared_preferences: ^2.2.2
+  vibration: ^3.2.1
 
 dev_dependencies:
   flutter_test:
