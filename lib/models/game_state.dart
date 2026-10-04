@@ -1,5 +1,5 @@
 import 'dart:math';
-import 'package:blockster/models/block_doc.dart';
+import 'package:blockster/models/block.dart';
 import 'package:blockster/constants/game_constants.dart';
 
 /// Manages the complete game state and logic for Blockster.

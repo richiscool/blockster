@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:blockster/models/game_state_doc.dart';
-import 'package:blockster/services/leaderboard_service_doc.dart';
-import 'package:blockster/screens/menu_screen_doc.dart';
+import 'package:blockster/models/game_state.dart';
+import 'package:blockster/services/leaderboard_service.dart';
+import 'package:blockster/screens/menu_screen.dart';
 
 /// Screen shown when the game ends (no valid placements remain).
 ///

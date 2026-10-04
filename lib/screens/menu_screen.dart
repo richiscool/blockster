@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:blockster/constants/game_constants.dart';
-import 'package:blockster/screens/game_screen_doc.dart';
+import 'package:blockster/screens/game_screen.dart';
 
 /// Main menu screen for Blockster.
 ///

@@ -1,43 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:blockster/constants/game_constants.dart';
-import 'package:blockster/models/block_doc.dart';
-import 'package:blockster/models/game_state_doc.dart';
-import 'package:blockster/services/haptic_feedback_service_doc.dart';
-import 'package:blockster/screens/lose_screen_doc.dart';
-import 'package:blockster/widgets/confetti_widget_doc.dart';
+import 'package:blockster/models/block.dart';
+import 'package:blockster/models/game_state.dart';
+import 'package:blockster/services/haptic_feedback_service.dart';
+import 'package:blockster/screens/lose_screen.dart';
+import 'package:blockster/widgets/confetti_widget.dart';
 
-/// Main gameplay screen where players place blocks on the 10x10 grid.
+/// Optimized main gameplay screen with CustomPaint and ValueNotifier for 60 FPS performance.
 ///
-/// Handles:
-/// - Grid rendering and visualization
-/// - Block dragging and placement preview
-/// - Placement validation with visual feedback (green = valid, red = invalid)
-/// - Score and move tracking
-/// - Confetti animation on line clears
-/// - Haptic feedback on game events
-/// - Game-over detection and navigation
+/// This version eliminates the performance bottlenecks of the GridView-based approach:
+/// - Uses CustomPaint instead of GridView.builder (single paint call vs 100 widgets)
+/// - Uses ValueNotifier for drag updates (no setState on every pixel movement)
+/// - Minimizes widget rebuilds
 class GameScreen extends StatefulWidget {
-  /// Creates the game screen.
   const GameScreen({Key? key}) : super(key: key);
 
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
 
-/// State for [GameScreen].
-///
-/// Manages game state, block selection, dragging, and placement.
 class _GameScreenState extends State<GameScreen> {
   /// The game state instance managing grid and logic.
   late GameState gameState;
 
   /// Currently selected block being dragged.
-  ///
-  /// Null if no block is being dragged.
   Block? selectedBlock;
 
-  /// Current drag position in screen coordinates.
-  Offset dragOffset = Offset.zero;
+  /// ValueNotifier for drag position (doesn't trigger setState).
+  /// Initialized in field declaration to ensure it's always available.
+  final ValueNotifier<Offset> _dragNotifier = ValueNotifier(Offset.zero);
 
   /// Whether the dragged block is currently over the grid.
   bool isDraggingOverGrid = false;
@@ -54,67 +45,73 @@ class _GameScreenState extends State<GameScreen> {
     gameState = GameState();
   }
 
+  @override
+  void dispose() {
+    _dragNotifier.dispose();
+    super.dispose();
+  }
+
   /// Called when user starts dragging a block.
-  ///
-  /// Parameters:
-  ///   - [details]: Drag start details with position
-  ///   - [block]: The block being dragged
   void _onBlockDragStart(DragStartDetails details, Block block) {
     setState(() {
       selectedBlock = block;
-      dragOffset = details.globalPosition;
     });
+    _dragNotifier.value = details.globalPosition;
   }
 
-  /// Called continuously while dragging.
-  ///
-  /// Updates preview position and validates placement.
-  ///
-  /// Parameters:
-  ///   - [details]: Drag update details with current position
+  /// Called continuously while dragging (updates notifier, not setState).
   void _onBlockDragUpdate(DragUpdateDetails details) {
     final renderBox = context.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
 
-    setState(() {
-      dragOffset = details.globalPosition;
+    // Update drag position in notifier (no setState!)
+    _dragNotifier.value = details.globalPosition;
 
-      // Calculate grid position if dragging over grid
-      const gridPosition = Offset(
-        GameConstants.gridPixelSize / 2 + 50,
-        80,
-      );
-      final distance =
-          (dragOffset - renderBox.localToGlobal(gridPosition)).distance;
+    // Calculate grid position
+    const gridPosition = Offset(
+      GameConstants.gridPixelSize / 2 + 50,
+      80,
+    );
+    final distance =
+        (details.globalPosition - renderBox.localToGlobal(gridPosition))
+            .distance;
 
-      isDraggingOverGrid =
-          distance < GameConstants.gridPixelSize / 2 && selectedBlock != null;
+    final isOverGrid =
+        distance < GameConstants.gridPixelSize / 2 && selectedBlock != null;
 
-      if (isDraggingOverGrid) {
-        final localPosition = renderBox.globalToLocal(dragOffset);
-        final relativePos = localPosition -
-            Offset(
-              MediaQuery.of(context).size.width / 2 -
-                  GameConstants.gridPixelSize / 2,
-              80,
-            );
+    if (isOverGrid) {
+      final localPosition = renderBox.globalToLocal(details.globalPosition);
+      final relativePos = localPosition -
+          Offset(
+            MediaQuery.of(context).size.width / 2 -
+                GameConstants.gridPixelSize / 2,
+            80,
+          );
 
-        previewGridX = (relativePos.dx / GameConstants.cellSize).floor();
-        previewGridY = (relativePos.dy / GameConstants.cellSize).floor();
-      } else {
+      final newGridX = (relativePos.dx / GameConstants.cellSize).floor();
+      final newGridY = (relativePos.dy / GameConstants.cellSize).floor();
+
+      // Only rebuild if grid position changed, not on every pixel movement
+      if (isDraggingOverGrid != isOverGrid ||
+          previewGridX != newGridX ||
+          previewGridY != newGridY) {
+        setState(() {
+          isDraggingOverGrid = isOverGrid;
+          previewGridX = newGridX;
+          previewGridY = newGridY;
+        });
+      }
+    } else if (isDraggingOverGrid) {
+      // Only rebuild when leaving grid
+      setState(() {
+        isDraggingOverGrid = false;
         previewGridX = null;
         previewGridY = null;
-      }
-    });
+      });
+    }
   }
 
   /// Called when user releases the drag.
-  ///
-  /// Attempts to place block if valid position.
-  /// Triggers haptic feedback and confetti on success.
-  ///
-  /// Parameters:
-  ///   - [details]: Drag end details
   Future<void> _onBlockDragEnd(DragEndDetails details) async {
     if (selectedBlock != null &&
         isDraggingOverGrid &&
@@ -133,7 +130,7 @@ class _GameScreenState extends State<GameScreen> {
         });
 
         // Trigger confetti animation
-        _showConfetti();
+        await _showConfetti();
 
         // Extra haptic feedback for combo
         if (gameState.isDoublePointsActive) {
@@ -172,61 +169,24 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   /// Shows confetti animation.
-  ///
-  /// Displays celebratory confetti and triggers line-clear haptic feedback.
-  void _showConfetti() {
+  Future<void> _showConfetti() async {
     // ✅ Haptic feedback: line cleared
-    HapticFeedbackService.lineCleared();
+    await HapticFeedbackService.lineCleared();
 
     // Show confetti overlay
-    showDialog(
-      context: context,
-      barrierColor: Colors.transparent,
-      builder: (context) => const Dialog(
-        backgroundColor: Colors.transparent,
-        child: ConfettiWidget(),
-      ),
-    );
-  }
-
-  /// Builds preview outline showing where block will be placed.
-  /// Green = valid placement, Red = invalid placement.
-  Widget _buildBlockPreviewOverlay() {
-    if (!isDraggingOverGrid ||
-        selectedBlock == null ||
-        previewGridX == null ||
-        previewGridY == null) {
-      return SizedBox.expand(
-        child: CustomPaint(
-          painter: BlockPreviewOverlayPainter(
-            gridX: null,
-            gridY: null,
-            block: null,
-            isValid: false,
-          ),
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierColor: Colors.transparent,
+        builder: (context) => const Dialog(
+          backgroundColor: Colors.transparent,
+          child: ConfettiWidget(),
         ),
       );
     }
-
-    bool isValidPlacement = gameState.canPlaceBlock(
-      selectedBlock!,
-      previewGridX!,
-      previewGridY!,
-    );
-
-    return SizedBox.expand(
-      child: CustomPaint(
-        painter: BlockPreviewOverlayPainter(
-          gridX: previewGridX,
-          gridY: previewGridY,
-          block: selectedBlock,
-          isValid: isValidPlacement,
-        ),
-      ),
-    );
   }
 
-  /// Builds the 10x10 game grid with occupied cells highlighted.
+  /// Builds the 10x10 game grid using CustomPaint (much faster than GridView).
   Widget _buildGrid() {
     return Center(
       child: Container(
@@ -238,31 +198,45 @@ class _GameScreenState extends State<GameScreen> {
         ),
         child: Stack(
           children: [
-            // Grid cells
-            GridView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: GameConstants.gridSize,
+            // Grid rendered with CustomPaint (single paint call instead of 100 widgets)
+            CustomPaint(
+              painter: GameGridPainter(gameState),
+              size: const Size(
+                GameConstants.gridPixelSize,
+                GameConstants.gridPixelSize,
               ),
-              itemCount: GameConstants.gridSize * GameConstants.gridSize,
-              itemBuilder: (context, index) {
-                int x = index % GameConstants.gridSize;
-                int y = index ~/ GameConstants.gridSize;
-                bool isOccupied = gameState.grid[y][x] != 0;
+            ),
+            // Drag preview (updates from ValueNotifier, not setState)
+            ValueListenableBuilder<Offset>(
+              valueListenable: _dragNotifier,
+              builder: (context, offset, _) {
+                if (!isDraggingOverGrid ||
+                    selectedBlock == null ||
+                    previewGridX == null ||
+                    previewGridY == null) {
+                  return const SizedBox.expand();
+                }
 
-                return Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: Colors.grey[700]!,
-                      width: 0.5,
-                    ),
-                    color: isOccupied ? Colors.blue : Colors.transparent,
+                bool isValidPlacement = gameState.canPlaceBlock(
+                  selectedBlock!,
+                  previewGridX!,
+                  previewGridY!,
+                );
+
+                return CustomPaint(
+                  painter: BlockPreviewOverlayPainter(
+                    gridX: previewGridX,
+                    gridY: previewGridY,
+                    block: selectedBlock,
+                    isValid: isValidPlacement,
+                  ),
+                  size: const Size(
+                    GameConstants.gridPixelSize,
+                    GameConstants.gridPixelSize,
                   ),
                 );
               },
             ),
-            // Preview overlay
-            _buildBlockPreviewOverlay(),
           ],
         ),
       ),
@@ -270,11 +244,7 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   /// Builds draggable block widget.
-  ///
-  /// Parameters:
-  ///   - [block]: The block to render
-  ///   - [index]: Block index (for identification)
-  Widget _buildDraggableBlock(Block block, int index) {
+  Widget _buildDraggableBlock(Block block) {
     return GestureDetector(
       onHorizontalDragStart: (details) => _onBlockDragStart(details, block),
       onHorizontalDragUpdate: _onBlockDragUpdate,
@@ -297,30 +267,12 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  /// Builds preview visualization of a block.
-  ///
-  /// Parameters:
-  ///   - [block]: The block to preview
+  /// Builds preview visualization of a block using CustomPaint.
   Widget _buildSmallBlockPreview(Block block) {
     return Center(
-      child: GridView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        shrinkWrap: true,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: block.width,
-        ),
-        itemCount: block.width * block.height,
-        itemBuilder: (context, index) {
-          int x = index % block.width;
-          int y = index ~/ block.width;
-
-          return Container(
-            decoration: BoxDecoration(
-              color: block.shape[y][x] == 1 ? block.color : Colors.transparent,
-              border: Border.all(color: Colors.grey, width: 0.5),
-            ),
-          );
-        },
+      child: CustomPaint(
+        painter: BlockPreviewPainter(block),
+        size: const Size(80, 80),
       ),
     );
   }
@@ -366,12 +318,9 @@ class _GameScreenState extends State<GameScreen> {
                           const SizedBox(height: 8),
                           Row(
                             children: gameState.currentBlocks
-                                .asMap()
-                                .entries
-                                .map((e) => Padding(
+                                .map((block) => Padding(
                                       padding: const EdgeInsets.all(4),
-                                      child:
-                                          _buildDraggableBlock(e.value, e.key),
+                                      child: _buildDraggableBlock(block),
                                     ))
                                 .toList(),
                           ),
@@ -384,9 +333,7 @@ class _GameScreenState extends State<GameScreen> {
                           const SizedBox(height: 8),
                           Row(
                             children: gameState.nextBlocks
-                                .asMap()
-                                .entries
-                                .map((e) => Container(
+                                .map((block) => Container(
                                       width: GameConstants.nextBlockPreviewSize,
                                       height:
                                           GameConstants.nextBlockPreviewSize,
@@ -395,7 +342,7 @@ class _GameScreenState extends State<GameScreen> {
                                             color: Colors.grey, width: 1),
                                         color: Colors.grey[800],
                                       ),
-                                      child: _buildSmallBlockPreview(e.value),
+                                      child: _buildSmallBlockPreview(block),
                                     ))
                                 .toList(),
                           ),
@@ -419,30 +366,104 @@ class _GameScreenState extends State<GameScreen> {
   }
 }
 
-/// Custom painter for block preview overlay.
+/// Custom painter for the game grid.
+/// Renders the 10x10 grid with occupied cells in a single paint call.
+class GameGridPainter extends CustomPainter {
+  final GameState gameState;
+
+  GameGridPainter(this.gameState);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cellSize = size.width / GameConstants.gridSize;
+
+    // Draw grid lines
+    final gridPaint = Paint()
+      ..color = Colors.black12
+      ..strokeWidth = 0.5;
+
+    for (int i = 0; i <= GameConstants.gridSize; i++) {
+      final offset = i * cellSize;
+      canvas.drawLine(
+        Offset(offset, 0),
+        Offset(offset, size.height),
+        gridPaint,
+      );
+      canvas.drawLine(
+        Offset(0, offset),
+        Offset(size.width, offset),
+        gridPaint,
+      );
+    }
+
+    // Draw occupied cells
+    final occupiedPaint = Paint()..color = Colors.blue.withValues(alpha: 0.6);
+
+    for (int y = 0; y < GameConstants.gridSize; y++) {
+      for (int x = 0; x < GameConstants.gridSize; x++) {
+        if (gameState.grid[y][x] != 0) {
+          canvas.drawRect(
+            Rect.fromLTWH(
+              x * cellSize + 1,
+              y * cellSize + 1,
+              cellSize - 2,
+              cellSize - 2,
+            ),
+            occupiedPaint,
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(GameGridPainter oldDelegate) => true;
+}
+
+/// Custom painter for block preview (small preview in block selector).
+class BlockPreviewPainter extends CustomPainter {
+  final Block block;
+
+  BlockPreviewPainter(this.block);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final occupied = block.getOccupiedCells();
+    if (occupied.isEmpty) return;
+
+    final maxX = occupied.map((c) => c.$1).fold(0, (a, b) => a > b ? a : b) + 1;
+    final maxY = occupied.map((c) => c.$2).fold(0, (a, b) => a > b ? a : b) + 1;
+
+    final cellWidth = size.width / maxX;
+    final cellHeight = size.height / maxY;
+
+    final paint = Paint()..color = block.color;
+
+    for (var (x, y) in occupied) {
+      canvas.drawRect(
+        Rect.fromLTWH(
+          x * cellWidth + 2,
+          y * cellHeight + 2,
+          cellWidth - 4,
+          cellHeight - 4,
+        ),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(BlockPreviewPainter oldDelegate) => false;
+}
+
+/// Custom painter for block preview overlay (when dragging over grid).
 /// Shows green outline for valid placement, red for invalid.
-///
-/// Used to provide real-time visual feedback while dragging blocks over the grid.
 class BlockPreviewOverlayPainter extends CustomPainter {
-  /// Grid X position of the preview (null if not over grid).
   final int? gridX;
-
-  /// Grid Y position of the preview (null if not over grid).
   final int? gridY;
-
-  /// The block being previewed (null if not over grid).
   final Block? block;
-
-  /// Whether the current placement is valid.
   final bool isValid;
 
-  /// Creates a block preview overlay painter.
-  ///
-  /// Parameters:
-  ///   - [gridX]: Grid X position
-  ///   - [gridY]: Grid Y position
-  ///   - [block]: The block being previewed
-  ///   - [isValid]: Whether placement is valid
   BlockPreviewOverlayPainter({
     required this.gridX,
     required this.gridY,
@@ -454,27 +475,31 @@ class BlockPreviewOverlayPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (gridX == null || gridY == null || block == null) return;
 
-    final paint = Paint()
+    final cellSize = size.width / GameConstants.gridSize;
+    final occupied = block!.getOccupiedCells();
+
+    final fillPaint = Paint()
       ..color = isValid
-          ? Colors.green.withValues(alpha: 0.4)
-          : Colors.red.withValues(alpha: 0.4)
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
+          ? Colors.green.withValues(alpha: 0.2)
+          : Colors.red.withValues(alpha: 0.2);
 
-    const cellSize = GameConstants.cellSize;
-    List<(int, int)> cells = block!.getOccupiedCells();
+    final outlinePaint = Paint()
+      ..color = isValid ? Colors.green : Colors.red
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
 
-    for (var (cellX, cellY) in cells) {
+    for (var (cellX, cellY) in occupied) {
       final x = (gridX! + cellX) * cellSize;
       final y = (gridY! + cellY) * cellSize;
 
-      canvas.drawRect(
-        Rect.fromLTWH(x, y, cellSize, cellSize),
-        paint,
-      );
+      final rect = Rect.fromLTWH(x + 1, y + 1, cellSize - 2, cellSize - 2);
+
+      canvas.drawRect(rect, fillPaint);
+      canvas.drawRect(rect, outlinePaint);
     }
   }
 
   @override
-  bool shouldRepaint(BlockPreviewOverlayPainter oldDelegate) => true;
+  bool shouldRepaint(BlockPreviewOverlayPainter oldDelegate) =>
+      oldDelegate.gridX != gridX || oldDelegate.gridY != gridY;
 }

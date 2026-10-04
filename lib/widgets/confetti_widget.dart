@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import '../constants/game_constants.dart';
 
 /// Represents a single confetti particle.
-/// 
+///
 /// Each particle has position, velocity, size, and color.
 /// Particles fall from top to bottom of the screen during animation.
 class ConfettiPiece {
@@ -32,7 +32,7 @@ class ConfettiPiece {
   double angularVelocity;
 
   /// Creates a new confetti particle.
-  /// 
+  ///
   /// Parameters:
   ///   - [x]: Starting X position
   ///   - [y]: Starting Y position
@@ -54,7 +54,7 @@ class ConfettiPiece {
   });
 
   /// Updates particle position based on velocity.
-  /// 
+  ///
   /// Called each frame to animate the particle falling and spinning.
   void update() {
     x += velocityX;
@@ -64,13 +64,13 @@ class ConfettiPiece {
 }
 
 /// Widget that displays and animates confetti particles.
-/// 
+///
 /// Shows confetti animation for 2 seconds (configurable via [GameConstants.confettiDuration]).
 /// Automatically dismisses itself after animation completes.
 /// Used to celebrate line clears and other achievements.
 class ConfettiWidget extends StatefulWidget {
   /// Creates a confetti widget.
-  /// 
+  ///
   /// The widget auto-dismisses after [GameConstants.confettiDuration].
   const ConfettiWidget({Key? key}) : super(key: key);
 
@@ -79,17 +79,17 @@ class ConfettiWidget extends StatefulWidget {
 }
 
 /// State for [ConfettiWidget].
-/// 
+///
 /// Manages animation controller, particle generation, and rendering.
 class _ConfettiWidgetState extends State<ConfettiWidget>
     with TickerProviderStateMixin {
   /// Animation controller for the confetti animation.
-  /// 
+  ///
   /// Drives the animation forward for [GameConstants.confettiDuration].
   late AnimationController _controller;
 
   /// List of active confetti particles.
-  /// 
+  ///
   /// Initialized in [didChangeDependencies] so [MediaQuery] is available.
   List<ConfettiPiece> _pieces = [];
 
@@ -118,7 +118,7 @@ class _ConfettiWidgetState extends State<ConfettiWidget>
   }
 
   /// Generates random confetti particles.
-  /// 
+  ///
   /// Creates [GameConstants.confettiParticleCount] particles with:
   ///   - Random positions (bottom of screen)
   ///   - Random velocities (upward and outward)
@@ -153,7 +153,7 @@ class _ConfettiWidgetState extends State<ConfettiWidget>
   }
 
   /// Updates all particles and redraws.
-  /// 
+  ///
   /// Called on each animation frame via [_controller].
   void _onFrame(Duration elapsed) {
     setState(() {
@@ -186,14 +186,14 @@ class _ConfettiWidgetState extends State<ConfettiWidget>
 }
 
 /// Custom painter that renders confetti particles.
-/// 
+///
 /// Draws each particle as a rotated rectangle with its assigned color.
 class ConfettiPainter extends CustomPainter {
   /// List of particles to paint.
   final List<ConfettiPiece> pieces;
 
   /// Creates a new confetti painter.
-  /// 
+  ///
   /// Parameters:
   ///   - [pieces]: The confetti particles to render
   ConfettiPainter(this.pieces);
