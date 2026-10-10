@@ -260,7 +260,7 @@ class _GameScreenState extends State<GameScreen> {
             color: selectedBlock == block ? Colors.yellow : Colors.white,
             width: 2,
           ),
-          color: Colors.grey[800],
+          color: Colors.transparent,
         ),
         child: _buildSmallBlockPreview(block),
       ),
@@ -277,6 +277,24 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
+  /// Builds smaller preview for next blocks (no container background).
+  Widget _buildSmallNextBlockPreview(Block block) {
+    return Container(
+      width: 50,
+      height: 50,
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey, width: 1),
+        color: Colors.transparent,
+      ),
+      child: Center(
+        child: CustomPaint(
+          painter: BlockPreviewPainter(block),
+          size: const Size(50, 50),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -284,80 +302,80 @@ class _GameScreenState extends State<GameScreen> {
         title: const Text('Blockster'),
         centerTitle: true,
       ),
-      body: Stack(
+      body: Column(
         children: [
-          SingleChildScrollView(
-            child: Column(
-              children: [
-                // Score display
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    'Score: ${gameState.score}',
-                    style: const TextStyle(
-                        fontSize: 28, fontWeight: FontWeight.bold),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Score display
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(
+                      'Score: ${gameState.score}',
+                      style: const TextStyle(
+                          fontSize: 28, fontWeight: FontWeight.bold),
+                    ),
                   ),
-                ),
 
-                // Game grid
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  child: _buildGrid(),
-                ),
-
-                // Current blocks & Next blocks
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        children: [
-                          const Text('Your Blocks',
-                              style: TextStyle(fontSize: 14)),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: gameState.currentBlocks
-                                .map((block) => Padding(
-                                      padding: const EdgeInsets.all(4),
-                                      child: _buildDraggableBlock(block),
-                                    ))
-                                .toList(),
-                          ),
-                        ],
-                      ),
-                      Column(
-                        children: [
-                          const Text('Next Blocks',
-                              style: TextStyle(fontSize: 14)),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: gameState.nextBlocks
-                                .map((block) => Container(
-                                      width: GameConstants.nextBlockPreviewSize,
-                                      height:
-                                          GameConstants.nextBlockPreviewSize,
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                            color: Colors.grey, width: 1),
-                                        color: Colors.grey[800],
-                                      ),
-                                      child: _buildSmallBlockPreview(block),
-                                    ))
-                                .toList(),
-                          ),
-                        ],
-                      ),
-                    ],
+                  // Game grid
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: _buildGrid(),
                   ),
-                ),
 
-                // Exit button
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Exit Game'),
-                ),
-              ],
+                  // Current blocks
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        const Text('Your Blocks',
+                            style: TextStyle(fontSize: 14)),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: gameState.currentBlocks
+                              .map((block) => Padding(
+                                    padding: const EdgeInsets.all(4),
+                                    child: _buildDraggableBlock(block),
+                                  ))
+                              .toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Next blocks (smaller and below)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      children: [
+                        const Text('Next Blocks',
+                            style: TextStyle(fontSize: 12)),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: gameState.nextBlocks
+                              .map((block) => Padding(
+                                    padding: const EdgeInsets.all(2),
+                                    child: _buildSmallNextBlockPreview(block),
+                                  ))
+                              .toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Exit button at bottom
+          Padding(
+            padding: const EdgeInsets.only(bottom: 32),
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Exit Game'),
             ),
           ),
         ],
