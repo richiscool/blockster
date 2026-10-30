@@ -35,32 +35,3 @@ While playing the game if they can't add a block anywhere send them to a lose sc
 On the lose screen thier is an input box that allows up to 3 letters for a user name.
 Using shared_preference add thier input into a leaderboard that is aranged from highest to lowest.
 Make a button that says "exit" on it that takes them to the menu
-
-Errors:
-    leaderboard_service.dart:
-        Unnecessary cast.
-        Try removing the cast.(Ln 51, Col 50)
-
-    game_screen.dart:
-        Don't use 'BuildContext's across async gaps.
-        Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check.(Ln 66, Col 24)
-
-        Use 'const' for final variables initialized to a constant value.
-        Try replacing 'final' with 'const'.(Ln 85, Col 5)
-
-        Use 'const' for final variables initialized to a constant value.
-        Try replacing 'final' with 'const'.(Ln 223, Col 5)
-
-        'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss.
-        Try replacing the use of the deprecated member with the replacement.(Ln 260, Col 54)
-
-    lose_screen.dart:
-        'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss.
-        Try replacing the use of the deprecated member with the replacement.(Ln 152, Col 43)
-
-Update:
-    Make the place where you grab blocks under the grid.
-    Make the next blocks under the grid and make it smaller.
-    Make sure nothing overlaps with the grid.
-    when hovering a block above the grid make an outline of where the block will go
-    and send me the code, thank you.
