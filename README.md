@@ -1,6 +1,4 @@
-# blockster
-
-A new Flutter project.
+# Blockster
 
 Create a Flutter project that creates a 10*10 grid in the middle of the screen.
 
@@ -35,3 +33,15 @@ While playing the game if they can't add a block anywhere send them to a lose sc
 On the lose screen thier is an input box that allows up to 3 letters for a user name.
 Using shared_preference add thier input into a leaderboard that is aranged from highest to lowest.
 Make a button that says "exit" on it that takes them to the menu
+
+
+## Light and Dark mode
+while playing a button on the top right should have a dark creasant to represent dark mode and when the cresant is cliked on it should change to dark mode. It should only appear in light mode
+
+a light colored sun to represent light mode and when the button is clicked change to light mode. It should only appear in dark mode
+
+## Levels
+In the menu there should be another button that says "Levels" and when it is clicked it will take you to a different screen where there are ten levels.
+
+The levels start with have already placed blocks that the player starts with until they reach up to 1000 points. 
+If they do they can then play that level even if they reach up to 1000 points

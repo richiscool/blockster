@@ -1,5 +1,5 @@
 /// Game configuration constants for Blockster.
-/// 
+///
 /// This file centralizes all magic numbers and configuration values
 /// used throughout the game for easy maintenance and tuning.
 abstract class GameConstants {
@@ -17,6 +17,10 @@ abstract class GameConstants {
   static const int blocksPerRound = 3;
   static const double blockContainerSize = 80.0;
   static const double nextBlockPreviewSize = 60.0;
+
+  // Levels
+  static const int levelCount = 10;
+  static const int pointsToUnlockNextLevel = 1000;
 
   // Leaderboard
   static const int topScoresCount = 10;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:blockster/constants/game_constants.dart';
 import 'package:blockster/screens/game_screen.dart';
+import 'package:blockster/screens/levels_screen.dart';
 
 /// Main menu screen for Blockster.
 ///
@@ -85,6 +86,15 @@ class _MenuScreenState extends State<MenuScreen>
     );
   }
 
+  /// Opens the level select screen.
+  void _onLevelsPressed() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const LevelsScreen(),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _gradientController.dispose();
@@ -150,6 +160,29 @@ class _MenuScreenState extends State<MenuScreen>
                       'PLAY',
                       style: TextStyle(
                         fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Levels Button
+                  ElevatedButton(
+                    onPressed: _onLevelsPressed,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 40,
+                        vertical: 14,
+                      ),
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.purple,
+                      elevation: 8,
+                    ),
+                    child: const Text(
+                      'Levels',
+                      style: TextStyle(
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 1,
                       ),

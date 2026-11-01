@@ -41,10 +41,14 @@ class GameState {
   /// Whether the game has ended (no valid placement exists).
   bool gameOver = false;
 
+  /// Optional starting layout (used by levels). Null = empty grid.
+  final List<List<int>>? _initialGrid;
+
   /// Creates a new GameState and initializes the game.
   ///
-  /// Sets up a fresh 10×10 grid and generates initial blocks.
-  GameState() {
+  /// Sets up a 10×10 grid (empty, or copied from [initialGrid] for levels)
+  /// and generates initial blocks.
+  GameState({List<List<int>>? initialGrid}) : _initialGrid = initialGrid {
     initializeGame();
   }
 
@@ -53,10 +57,13 @@ class GameState {
   /// Clears the grid, resets score/moves, deactivates combo,
   /// generates new blocks, and marks game as active.
   void initializeGame() {
-    grid = List.generate(
-      GameConstants.gridSize,
-      (_) => List.generate(GameConstants.gridSize, (_) => 0),
-    );
+    final initial = _initialGrid;
+    grid = initial != null
+        ? initial.map((row) => [...row]).toList()
+        : List.generate(
+            GameConstants.gridSize,
+            (_) => List.generate(GameConstants.gridSize, (_) => 0),
+          );
     currentBlocks = [];
     nextBlocks = [];
     score = 0;
@@ -66,6 +73,10 @@ class GameState {
     gameOver = false;
 
     generateNewBlocks();
+    // Pre-filled level grids must not start already lost.
+    for (int i = 0; i < 20 && !canPlaceAnyBlock(); i++) {
+      generateNewBlocks();
+    }
     generateNextBlocks();
   }
 

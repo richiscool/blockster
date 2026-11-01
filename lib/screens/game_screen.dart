@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:blockster/constants/game_constants.dart';
 import 'package:blockster/models/block.dart';
 import 'package:blockster/models/game_state.dart';
+import 'package:blockster/models/level_data.dart';
+import 'package:blockster/services/level_service.dart';
+import 'package:blockster/services/theme_controller.dart';
 import 'package:blockster/services/haptic_feedback_service.dart';
 import 'package:blockster/screens/lose_screen.dart';
 import 'package:blockster/widgets/confetti_widget.dart';
@@ -13,7 +16,12 @@ import 'package:blockster/widgets/confetti_widget.dart';
 /// - Uses ValueNotifier for drag updates (no setState on every pixel movement)
 /// - Minimizes widget rebuilds
 class GameScreen extends StatefulWidget {
-  const GameScreen({Key? key}) : super(key: key);
+  /// Level number (1-10) to play, or null for the regular endless game.
+  ///
+  /// Levels start with blocks already placed on the grid.
+  final int? level;
+
+  const GameScreen({Key? key, this.level}) : super(key: key);
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -39,10 +47,16 @@ class _GameScreenState extends State<GameScreen> {
   /// Preview grid Y position (null if not over grid).
   int? previewGridY;
 
+  /// Whether this level's point goal has already been reached.
+  bool _levelGoalReached = false;
+
   @override
   void initState() {
     super.initState();
-    gameState = GameState();
+    gameState = GameState(
+      initialGrid:
+          widget.level != null ? LevelData.gridFor(widget.level!) : null,
+    );
   }
 
   @override
@@ -129,6 +143,9 @@ class _GameScreenState extends State<GameScreen> {
           isDraggingOverGrid = false;
         });
 
+        // Unlock the next level once the goal score is reached
+        _checkLevelGoal();
+
         // Trigger confetti animation
         await _showConfetti();
 
@@ -168,6 +185,29 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
+  /// Unlocks the next level when the score reaches the goal.
+  ///
+  /// The player can keep playing after reaching it.
+  Future<void> _checkLevelGoal() async {
+    final level = widget.level;
+    if (level == null || _levelGoalReached) return;
+    if (gameState.score < GameConstants.pointsToUnlockNextLevel) return;
+
+    _levelGoalReached = true;
+    await LevelService.completeLevel(level);
+    if (!mounted) return;
+
+    setState(() {});
+    final message = level < GameConstants.levelCount
+        ? '${GameConstants.pointsToUnlockNextLevel} points! '
+            'Level ${level + 1} unlocked'
+        : '${GameConstants.pointsToUnlockNextLevel} points! '
+            'You beat the final level';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
+    );
+  }
+
   /// Shows confetti animation.
   Future<void> _showConfetti() async {
     // ✅ Haptic feedback: line cleared
@@ -193,7 +233,10 @@ class _GameScreenState extends State<GameScreen> {
         width: GameConstants.gridPixelSize,
         height: GameConstants.gridPixelSize,
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.black, width: 2),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.onSurface,
+            width: 2,
+          ),
           color: Colors.grey[900],
         ),
         child: Stack(
@@ -257,7 +300,9 @@ class _GameScreenState extends State<GameScreen> {
         height: GameConstants.blockContainerSize,
         decoration: BoxDecoration(
           border: Border.all(
-            color: selectedBlock == block ? Colors.yellow : Colors.white,
+            color: selectedBlock == block
+                ? Colors.yellow
+                : Theme.of(context).colorScheme.onSurface,
             width: 2,
           ),
           color: Colors.transparent,
@@ -297,10 +342,24 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Blockster'),
+        title: Text(
+          widget.level != null ? 'Level ${widget.level}' : 'Blockster',
+        ),
         centerTitle: true,
+        actions: [
+          // Moon shows in light mode, sun shows in dark mode.
+          IconButton(
+            tooltip: isDark ? 'Switch to light mode' : 'Switch to dark mode',
+            icon: isDark
+                ? const Icon(Icons.light_mode, color: Colors.amber)
+                : const Icon(Icons.dark_mode),
+            onPressed: ThemeController.toggle,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -311,10 +370,22 @@ class _GameScreenState extends State<GameScreen> {
                   // Score display
                   Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      'Score: ${gameState.score}',
-                      style: const TextStyle(
-                          fontSize: 28, fontWeight: FontWeight.bold),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Score: ${gameState.score}',
+                          style: const TextStyle(
+                              fontSize: 28, fontWeight: FontWeight.bold),
+                        ),
+                        if (widget.level != null)
+                          Text(
+                            _levelGoalReached
+                                ? 'Next level unlocked!'
+                                : 'Goal: ${GameConstants.pointsToUnlockNextLevel} points '
+                                    'to unlock the next level',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                      ],
                     ),
                   ),
 
@@ -397,7 +468,7 @@ class GameGridPainter extends CustomPainter {
 
     // Draw grid lines
     final gridPaint = Paint()
-      ..color = Colors.black12
+      ..color = Colors.white24
       ..strokeWidth = 0.5;
 
     for (int i = 0; i <= GameConstants.gridSize; i++) {
