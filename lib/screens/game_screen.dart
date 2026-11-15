@@ -50,6 +50,9 @@ class _GameScreenState extends State<GameScreen> {
   /// Whether this level's point goal has already been reached.
   bool _levelGoalReached = false;
 
+  /// Key used to find the grid's real position on screen.
+  final GlobalKey _gridKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -74,53 +77,53 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   /// Called continuously while dragging (updates notifier, not setState).
+  ///
+  /// The grid position is measured from the grid's actual location on screen
+  /// (via [_gridKey]), so it stays correct however the layout changes.
   void _onBlockDragUpdate(DragUpdateDetails details) {
-    final renderBox = context.findRenderObject() as RenderBox?;
-    if (renderBox == null) return;
-
-    // Update drag position in notifier (no setState!)
     _dragNotifier.value = details.globalPosition;
 
-    // Calculate grid position
-    const gridPosition = Offset(
-      GameConstants.gridPixelSize / 2 + 50,
-      80,
+    final block = selectedBlock;
+    final gridBox = _gridKey.currentContext?.findRenderObject() as RenderBox?;
+    if (block == null || gridBox == null) return;
+
+    const cell = GameConstants.cellSize;
+    // The block is shown slightly above the finger so it isn't hidden.
+    const lift = cell * 2;
+
+    final local = gridBox.globalToLocal(details.globalPosition);
+
+    // Only react when the finger is on or near the grid.
+    const nearGrid = Rect.fromLTRB(
+      -cell * 2,
+      -cell * 2,
+      GameConstants.gridPixelSize + cell * 2,
+      GameConstants.gridPixelSize + cell * 4,
     );
-    final distance =
-        (details.globalPosition - renderBox.localToGlobal(gridPosition))
-            .distance;
 
-    final isOverGrid =
-        distance < GameConstants.gridPixelSize / 2 && selectedBlock != null;
-
-    if (isOverGrid) {
-      final localPosition = renderBox.globalToLocal(details.globalPosition);
-      final relativePos = localPosition -
-          Offset(
-            MediaQuery.of(context).size.width / 2 -
-                GameConstants.gridPixelSize / 2,
-            80,
-          );
-
-      final newGridX = (relativePos.dx / GameConstants.cellSize).floor();
-      final newGridY = (relativePos.dy / GameConstants.cellSize).floor();
-
-      // Only rebuild if grid position changed, not on every pixel movement
-      if (isDraggingOverGrid != isOverGrid ||
-          previewGridX != newGridX ||
-          previewGridY != newGridY) {
+    if (!nearGrid.contains(local)) {
+      if (isDraggingOverGrid) {
         setState(() {
-          isDraggingOverGrid = isOverGrid;
-          previewGridX = newGridX;
-          previewGridY = newGridY;
+          isDraggingOverGrid = false;
+          previewGridX = null;
+          previewGridY = null;
         });
       }
-    } else if (isDraggingOverGrid) {
-      // Only rebuild when leaving grid
+      return;
+    }
+
+    // Center the block on the finger (shifted up by [lift]).
+    final newGridX = ((local.dx - block.width * cell / 2) / cell).round();
+    final newGridY =
+        ((local.dy - lift - block.height * cell / 2) / cell).round();
+
+    if (!isDraggingOverGrid ||
+        previewGridX != newGridX ||
+        previewGridY != newGridY) {
       setState(() {
-        isDraggingOverGrid = false;
-        previewGridX = null;
-        previewGridY = null;
+        isDraggingOverGrid = true;
+        previewGridX = newGridX;
+        previewGridY = newGridY;
       });
     }
   }
@@ -230,14 +233,16 @@ class _GameScreenState extends State<GameScreen> {
   Widget _buildGrid() {
     return Center(
       child: Container(
+        key: _gridKey,
         width: GameConstants.gridPixelSize,
         height: GameConstants.gridPixelSize,
-        decoration: BoxDecoration(
+        decoration: BoxDecoration(color: Colors.grey[900]),
+        // Border is drawn over the grid so it doesn't reduce the playable area.
+        foregroundDecoration: BoxDecoration(
           border: Border.all(
             color: Theme.of(context).colorScheme.onSurface,
             width: 2,
           ),
-          color: Colors.grey[900],
         ),
         child: Stack(
           children: [
@@ -289,12 +294,15 @@ class _GameScreenState extends State<GameScreen> {
   /// Builds draggable block widget.
   Widget _buildDraggableBlock(Block block) {
     return GestureDetector(
-      onHorizontalDragStart: (details) => _onBlockDragStart(details, block),
-      onHorizontalDragUpdate: _onBlockDragUpdate,
-      onHorizontalDragEnd: _onBlockDragEnd,
-      onVerticalDragStart: (details) => _onBlockDragStart(details, block),
-      onVerticalDragUpdate: _onBlockDragUpdate,
-      onVerticalDragEnd: _onBlockDragEnd,
+      onPanStart: (details) => _onBlockDragStart(details, block),
+      onPanUpdate: _onBlockDragUpdate,
+      onPanEnd: _onBlockDragEnd,
+      onPanCancel: () => setState(() {
+        selectedBlock = null;
+        previewGridX = null;
+        previewGridY = null;
+        isDraggingOverGrid = false;
+      }),
       child: Container(
         width: GameConstants.blockContainerSize,
         height: GameConstants.blockContainerSize,
@@ -369,7 +377,7 @@ class _GameScreenState extends State<GameScreen> {
                 children: [
                   // Score display
                   Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(8.0),
                     child: Column(
                       children: [
                         Text(
@@ -391,13 +399,13 @@ class _GameScreenState extends State<GameScreen> {
 
                   // Game grid
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     child: _buildGrid(),
                   ),
 
                   // Current blocks
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(8),
                     child: Column(
                       children: [
                         const Text('Your Blocks',
@@ -468,8 +476,8 @@ class GameGridPainter extends CustomPainter {
 
     // Draw grid lines
     final gridPaint = Paint()
-      ..color = Colors.white24
-      ..strokeWidth = 0.5;
+      ..color = Colors.white38
+      ..strokeWidth = 1.5;
 
     for (int i = 0; i <= GameConstants.gridSize; i++) {
       final offset = i * cellSize;
